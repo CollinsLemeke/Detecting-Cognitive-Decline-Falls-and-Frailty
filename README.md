@@ -40,7 +40,7 @@ The notebook takes a small set of walking measurements from a foot-mounted senso
 
 | Task | What it means | How it is defined in the data |
 |---|---|---|
-| **Dementia** | Signs of cognitive decline | GDS score of 3 or more |
+| **Cognitive decline** | Signs of cognitive decline | GDS score of 3 or more |
 | **Falls** | Fell at least once in the last year | Self-reported yes or no |
 | **Frailty** | Physically frail | Fried score of 2 or more |
 
@@ -59,15 +59,15 @@ Scores are **ROC-AUC**, averaged over 5-fold cross-validation repeated 10 times.
 
 | Task | Best algorithm | ROC-AUC |
 |---|---|---|
-| Dementia | Logistic Regression | **0.752** |
+| Cognitive decline | Logistic Regression | **0.752** |
 | Falls | Random Forest | **0.814** |
-| Frailty | Logistic Regression | **0.749** |
+| Frailty | Logistic Regression / Random Forest (tie) | **0.75** |
 
-On the dementia task, at the standard 0.5 decision threshold, the model **caught 31 of the 43 people showing signs of decline, a catch rate of 72%**.
+On the cognitive decline task, at the standard 0.5 decision threshold, the model **caught 31 of the 43 people showing signs of decline, a catch rate of 72%**.
 
 Two things worth noticing:
 
-- The **simple, explainable model wins** on the two rarer conditions. More complexity did not help here.
+- The **simple, explainable model wins** on cognitive decline and **ties** on frailty (0.749 vs 0.750; which edges ahead can flip with your scikit-learn version). More complexity did not help on the rarer conditions.
 - The error bars in the comparison chart overlap, so treat "best algorithm" as a mild lead rather than a clear win.
 
 ---
@@ -77,31 +77,34 @@ Two things worth noticing:
 ### Option A: Google Colab (easiest, nothing to install)
 
 1. Open the notebook in Colab.
-2. Download `Database_register.xlsx` from the GSTRIDE dataset (see [The data](#5-the-data)).
+2. Download `data/Database_register.xlsx` from this repository (it is included, see [The data](#5-the-data)).
 3. Upload it to the Colab session using the folder icon on the left, so it lands at `/content/Database_register.xlsx`.
 4. Run all cells from top to bottom.
 
 ### Option B: On your own machine
 
 ```bash
-git clone https://github.com/CollinsLemeke/<repo-name>.git
-cd <repo-name>
+git clone https://github.com/CollinsLemeke/Detecting-Cognitive-Decline-Falls-and-Frailty.git
+cd Detecting-Cognitive-Decline-Falls-and-Frailty
 pip install -r requirements.txt
 jupyter notebook notebooks/gstride_psychointelligence.ipynb
 ```
 
-Place the data file at `data/Database_register.xlsx`.
+The data file is already in `data/Database_register.xlsx`, so there is nothing else to download.
 
 The notebook looks for the file in four places automatically (`data/`, `../data/`, `/content/`, and the current folder), so it works from the repo root, from a subfolder, or from Colab without any edits.
 
-Suggested repository layout:
+Repository layout:
 
 ```
 .
 ├── data/
-│   └── Database_register.xlsx      # download separately, not stored in this repo
+│   └── Database_register.xlsx      # GSTRIDE register, CC BY 4.0 (see The data)
 ├── notebooks/
 │   └── gstride_psychointelligence.ipynb
+├── src/
+│   └── reproduce.py                # script version of the analysis
+├── CITATION.cff
 ├── requirements.txt
 └── README.md
 ```
@@ -118,7 +121,9 @@ Source paper:
 
 > García-de-Villa, S., Jiménez, A. R., del-Ama, A. J., et al. (2023). *A database with frailty, functional and inertial gait metrics for the research of fall causes in older adults.* **Scientific Data**, 10, 566. https://doi.org/10.1038/s41597-023-02428-0
 
-The data file is **not included in this repository**. Please download it from the source and follow the dataset's own terms of use.
+**Licence and redistribution.** GSTRIDE is published on Zenodo under the [Creative Commons Attribution 4.0 International (CC BY 4.0)](https://creativecommons.org/licenses/by/4.0/) licence, which allows redistribution as long as the creators are credited. The participant register used here (`data/Database_register.xlsx`) is included in this repository under that licence for convenience. The full dataset, including the raw inertial recordings, is available from the original record: https://doi.org/10.5281/zenodo.6883292
+
+If you reuse the data, please cite the authors as shown in [Citation and credit](#13-citation-and-credit). The MIT licence in this repository covers the code and analysis only, not the dataset.
 
 ---
 
@@ -166,11 +171,11 @@ The notebook runs in 14 steps. Each has a short explanation and at least one cha
 
 | Target | People with the condition | Share |
 |---|---|---|
-| Dementia | 43 of 163 | 26% |
+| Cognitive decline | 43 of 163 | 26% |
 | Falls | 86 of 163 | 53% |
 | Frailty | 49 of 163 | 30% |
 
-Falls is close to an even split. Dementia is the rarest, so its results deserve the most scepticism.
+Falls is close to an even split. Cognitive decline is the rarest, so its results deserve the most scepticism.
 
 **Step 5. Who is in the study.** Sex, cognitive status and age bands. Mostly women, mostly aged 80 and over. This tells you who the conclusions can reasonably apply to.
 
@@ -198,7 +203,7 @@ After cleaning, every VIF is comfortably under 5 (highest is 2.9 for step speed)
 
 All three sit inside a pipeline that imputes, then scales, then models. Logistic Regression and Random Forest use balanced class weights so the rarer group is not ignored.
 
-**Step 11. A closer look at dementia.** The ROC curve and confusion matrix for the winning model. 31 of 43 cases caught, 12 missed.
+**Step 11. A closer look at cognitive decline.** The ROC curve and confusion matrix for the winning model. 31 of 43 cases caught, 12 missed.
 
 **Step 12. What the model learned.** Odds ratios for each of the six features. See the next section.
 
@@ -210,7 +215,7 @@ All three sit inside a pipeline that imputes, then scales, then models. Logistic
 
 ## 8. What the model learned
 
-Odds ratios from the logistic regression on the dementia task, with all features standardised so they can be compared fairly:
+Odds ratios from the logistic regression on the cognitive decline task, with all features standardised so they can be compared fairly:
 
 | Feature | Odds ratio | Direction | Statistically reliable (p < 0.05) |
 |---|---|---|---|
@@ -235,7 +240,7 @@ Odds ratios from the logistic regression on the dementia task, with all features
 All three tasks use the **same six measurements**. So do they just flag the same people?
 
 - **Falls and frailty agree almost perfectly** (correlation around 0.9). For practical purposes they are one physical signal wearing two hats.
-- **Dementia agrees only moderately** (around 0.5 to 0.7). Related, but clearly its own thing.
+- **Cognitive decline agrees only moderately** (around 0.5 to 0.7). Related, but clearly its own thing.
 
 That gap is the contribution. If cognitive decline were simply frailty in disguise, its risk score would track frailty almost exactly. It does not. **The walk appears to carry brain-specific information beyond plain physical frailty**, which is the core claim of the Psychointelligence framing.
 
