@@ -137,7 +137,7 @@ def build_targets(df: pd.DataFrame, cols: list) -> dict[str, pd.Series]:
     )
 
     return {
-        "Dementia": (gds >= 3).astype(int),
+        "Cognitive decline": (gds >= 3).astype(int),
         "Falls": falls.astype(int),
         "Frailty": (fried >= 2).astype(int),
     }
@@ -184,7 +184,7 @@ def main() -> int:
     print(f"Data file : {path}")
     print(f"Sample    : {len(df)} participants")
     for name, y in targets.items():
-        print(f"  {name:<10} {int(y.sum()):>3} of {len(y)}  ({100 * y.mean():.0f}% positive)")
+        print(f"  {name:<17} {int(y.sum()):>3} of {len(y)}  ({100 * y.mean():.0f}% positive)")
 
     # ---- Redundancy check: why we dropped four gait measures ---------------- #
     header("FEATURE REDUNDANCY (VIF)")
@@ -228,8 +228,8 @@ def main() -> int:
         winners[task] = rows[0]
 
     # ---- Screening performance on the primary task -------------------------- #
-    header("SCREENING PERFORMANCE  (dementia, out-of-fold)")
-    y_dem = targets["Dementia"]
+    header("SCREENING PERFORMANCE  (cognitive decline, out-of-fold)")
+    y_dem = targets["Cognitive decline"]
     proba = cross_val_predict(
         make_models()["Logistic Regression"], X, y_dem,
         cv=StratifiedKFold(5, shuffle=True, random_state=1),
@@ -243,7 +243,7 @@ def main() -> int:
     print(f"  Catch rate   : {100 * caught / (caught + missed):.0f}%")
 
     # ---- What the model learned --------------------------------------------- #
-    header("ODDS RATIOS  (dementia, per 1 SD)")
+    header("ODDS RATIOS  (cognitive decline, per 1 SD)")
     print("  Above 1 raises the odds of cognitive decline, below 1 lowers them.\n")
     imputed = X.fillna(X.median())
     standardised = pd.DataFrame(StandardScaler().fit_transform(imputed), columns=FEATURES)
@@ -274,7 +274,7 @@ def main() -> int:
     for i in range(len(names)):
         for j in range(i + 1, len(names)):
             r, _ = pearsonr(scores[names[i]], scores[names[j]])
-            print(f"    {names[i]:<10} vs {names[j]:<10} r = {r:+.2f}")
+            print(f"    {names[i]:<17} vs {names[j]:<17} r = {r:+.2f}")
 
     header("DONE")
     print("  These figures should match the notebook and the README exactly.")
