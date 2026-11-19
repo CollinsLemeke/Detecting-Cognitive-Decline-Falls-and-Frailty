@@ -1,8 +1,10 @@
 # Gait as a Window into the Brain
 
-**Can a machine spot early signs of cognitive decline just from the way an older adult walks?**
+**How much does the way an older adult walks tell us about their cognitive health, and does a foot sensor add anything to a simple clinical walking test?**
 
-This repository contains a single, fully commented notebook that tests that question on the public **GSTRIDE** dataset of 163 older adults. Every step explains what is happening and why, so you do not need a machine learning background to follow it.
+This repository contains a single, fully commented notebook that tests these questions on the public **GSTRIDE** dataset of 163 older adults. Every step explains what is happening and why, so you do not need a machine learning background to follow it.
+
+The analysis supports the paper *"Psychointelligence for Dementia and Falls in Older Adults: Interpretable Cognitive-Decline Screening from Gait Sensor Data"*, accepted at **ICOIN 2027**. The notebook includes every extra check the reviewers asked for.
 
 ---
 
@@ -16,7 +18,7 @@ This repository contains a single, fully commented notebook that tests that ques
 6. [Glossary for beginners](#6-glossary-for-beginners)
 7. [Walkthrough of the notebook](#7-walkthrough-of-the-notebook)
 8. [What the model learned](#8-what-the-model-learned)
-9. [The main finding](#9-the-main-finding)
+9. [The main findings](#9-the-main-findings)
 10. [Honest limitations](#10-honest-limitations)
 11. [Roadmap](#11-roadmap)
 12. [Requirements](#12-requirements)
@@ -26,49 +28,64 @@ This repository contains a single, fully commented notebook that tests that ques
 
 ## 1. The idea in plain English
 
-Walking feels automatic, but it is not. Staying upright and steady takes attention, planning and balance, and all three are jobs the brain does. So when the brain starts to struggle, the walk quietly changes before anyone notices a memory problem.
+Walking feels automatic, but it is not. Staying upright and steady takes attention, planning and balance, and all three are jobs the brain does. So when the brain struggles, the way a person moves can change too.
 
-This project tests whether a machine can pick up that quiet change.
+This project tests how strongly movement is linked to cognitive decline, and which movement measurements carry that link.
 
-The project sits under a research theme the CIoTh lab calls **Psychointelligence**: the idea that mental state leaves measurable traces in ordinary behaviour, and that everyday sensors can read those traces in a way people can understand and trust.
+The project sits under a research theme the CIoTh lab calls **Psychointelligence**: the idea that mental state leaves measurable traces in ordinary behaviour, and that everyday sensors can read those traces in a way people can understand and trust. This study tests two parts of that idea: physical mobility and cognition.
 
 ---
 
 ## 2. What this project actually does
 
-The notebook takes a small set of walking measurements from a foot-mounted sensor, plus age and BMI, and tries to predict three yes or no questions about each person:
+The notebook takes a small set of walking measurements from a foot-mounted sensor, plus the Timed Up and Go (TUG) test, age and BMI, and tries to predict three yes or no questions about each person:
 
 | Task | What it means | How it is defined in the data |
 |---|---|---|
-| **Cognitive decline** | Signs of cognitive decline | GDS score of 3 or more |
+| **Cognitive decline** | Signs of cognitive decline (main task) | GDS score of 3 or more |
 | **Falls** | Fell at least once in the last year | Self-reported yes or no |
 | **Frailty** | Physically frail | Fried score of 2 or more |
 
-Three different algorithms are trained on all three tasks, so you can see which style of model suits which problem. The whole thing runs in a few minutes on a free Google Colab session.
+Three design choices matter more than the accuracy numbers:
 
-Two design choices matter more than the accuracy numbers:
-
-- **Explainability first.** The headline model is plain logistic regression, so you can read exactly which measurements pushed a prediction up or down. A black box that scores slightly higher would be far less useful in a clinic.
-- **Redundancy removed before modelling.** Walking speed, stride length and cadence are largely the same information in three costumes. Feeding all of them in makes the explanations meaningless. The notebook measures the overlap and keeps only clean representatives.
+- **Explainability first.** The main model is plain logistic regression, chosen in advance, so you can read exactly which measurements pushed a prediction up or down.
+- **Redundancy removed before modelling.** Walking speed, stride length and cadence are largely the same information in three costumes. The notebook measures the overlap and keeps only clean representatives.
+- **Honest testing.** Every score comes with a 95% confidence interval, and the notebook checks for data leakage, uses nested cross-validation, and tests whether the foot sensor adds anything beyond the TUG test.
 
 ---
 
 ## 3. Results at a glance
 
-Scores are **ROC-AUC**, averaged over 5-fold cross-validation repeated 10 times. 0.5 means the model is guessing. 1.0 is perfect. Around 0.75 is genuinely useful for screening.
+Scores are **ROC-AUC** from out-of-fold predictions, using 5-fold cross-validation repeated 10 times. 0.5 means the model is guessing. 1.0 is perfect.
 
-| Task | Best algorithm | ROC-AUC |
-|---|---|---|
-| Cognitive decline | Logistic Regression | **0.752** |
-| Falls | Random Forest | **0.814** |
-| Frailty | Logistic Regression / Random Forest (tie) | **0.75** |
+**Cognitive decline (main task)**
 
-On the cognitive decline task, at the standard 0.5 decision threshold, the model **caught 31 of the 43 people showing signs of decline, a catch rate of 72%**.
+| Measure | Result |
+|---|---|
+| AUC, logistic regression (chosen in advance) | **0.747** (95% CI 0.660 to 0.828) |
+| AUC, nested cross-validation (stricter check) | **0.710** (95% CI 0.601 to 0.801) |
+| At threshold 0.5: cases caught | **28 of 43** (sensitivity 0.66) |
+| Specificity / precision | 0.72 / 0.46 |
+| Share of people referred | 38% |
 
-Two things worth noticing:
+**What carries the signal?** (ablation)
 
-- The **simple, explainable model wins** on cognitive decline and **ties** on frailty (0.749 vs 0.750; which edges ahead can flip with your scikit-learn version). More complexity did not help on the rarer conditions.
-- The error bars in the comparison chart overlap, so treat "best algorithm" as a mild lead rather than a clear win.
+| Measurements used | AUC (95% CI) |
+|---|---|
+| Age + BMI only | 0.659 (0.555 to 0.754) |
+| Walking speed only | 0.656 (0.569 to 0.741) |
+| Sensor gait only (speed, clearance, stride-time variability) | 0.664 (0.568 to 0.758) |
+| **TUG time only** | **0.729** (0.643 to 0.808) |
+| TUG + sensor gait | 0.726 (0.636 to 0.809) |
+| Full model (6 features) | 0.747 (0.660 to 0.828) |
+
+Three things worth noticing:
+
+- **TUG time does most of the work.** On its own it almost matches the full model. Adding the foot-sensor features to TUG does not clearly improve the result.
+- **The model finds moderate or worse decline, not mild decline.** AUC is 0.802 for GDS 4 and above, but only 0.619 for GDS 3 (not reliably better than guessing).
+- **Simple beats complex here.** In nested cross-validation, logistic regression was chosen in 29 of 50 folds, ahead of random forest (14) and gradient boosting (7).
+
+> An earlier version of this notebook reported AUC 0.752 and 31 of 43 cases caught. Those came from fold-averaged AUC and a single data split. The numbers above are the more reliable, repeated estimates.
 
 ---
 
@@ -92,7 +109,9 @@ jupyter notebook notebooks/gstride_psychointelligence.ipynb
 
 The data file is already in `data/Database_register.xlsx`, so there is nothing else to download.
 
-The notebook looks for the file in four places automatically (`data/`, `../data/`, `/content/`, and the current folder), so it works from the repo root, from a subfolder, or from Colab without any edits.
+### Option C: Kaggle
+
+The notebook also runs on Kaggle with the GSTRIDE dataset attached. A full run takes about 5 to 10 minutes on CPU (nested cross-validation is the slowest step). It does not use a GPU.
 
 Repository layout:
 
@@ -103,7 +122,7 @@ Repository layout:
 ├── notebooks/
 │   └── gstride_psychointelligence.ipynb
 ├── src/
-│   └── reproduce.py                # script version of the analysis
+│   └── reproduce.py                # script version of the original analysis
 ├── CITATION.cff
 ├── requirements.txt
 └── README.md
@@ -132,7 +151,7 @@ If you reuse the data, please cite the authors as shown in [Citation and credit]
 | Term | What it means in plain English |
 |---|---|
 | **IMU** | Inertial Measurement Unit. A small motion sensor, like the one in a phone or fitness tracker, worn on the foot here. |
-| **GDS** | Global Deterioration Scale. A clinical score for stages of cognitive decline. A score of 3 or more is used here as "signs of decline". |
+| **GDS** | Global Deterioration Scale. A clinical score for stages of cognitive decline, from 1 (none) to 7 (severe). A score of 3 or more is used here as "signs of decline". It is not a dementia diagnosis. |
 | **Fried phenotype** | A standard five-part checklist for physical frailty. A score of 2 or more is used here as "frail". |
 | **TUG** | Timed Up and Go. A simple clinical test: stand up from a chair, walk 3 metres, turn, come back, sit down. Longer time means worse mobility. |
 | **Clearance** | How high the foot lifts off the ground during a step. Low clearance means shuffling. |
@@ -140,34 +159,35 @@ If you reuse the data, please cite the authors as shown in [Citation and credit]
 | **Feature** | One input measurement the model is allowed to use. |
 | **Target** | The yes or no answer the model is trying to predict. |
 | **Class imbalance** | When one answer is much rarer than the other. Rarer means fewer examples to learn from, so harder. |
-| **Correlation** | How strongly two measurements move together. |
 | **VIF** | Variance Inflation Factor, a redundancy meter. Above 5 is a warning, above 10 is severe. |
 | **Imputation** | Filling in a missing value. Here, with the column's median (its middle value). |
-| **Cross-validation** | Splitting people into groups, training on most and testing on the rest, then rotating so everyone gets a turn as the test set. It gives a fairer score than a single split. |
+| **Cross-validation** | Splitting people into groups, training on most and testing on the rest, then rotating so everyone gets a turn as the test set. |
+| **Nested cross-validation** | Cross-validation inside cross-validation. The inner loop picks the algorithm; the outer loop tests it on people it has never seen. It stops the model-choosing step from flattering the score. |
+| **Data leakage** | When information from the test people sneaks into training, making results look better than they are. |
 | **ROC-AUC** | One number summarising how well the model separates the two groups. 0.5 is guessing, 1.0 is perfect. |
-| **Confusion matrix** | A 2x2 table of what the model got right and wrong: cases caught, cases missed, false alarms, correct all-clears. |
-| **Odds ratio (OR)** | How much the odds of a condition change when a measurement goes up. Above 1 raises the odds, below 1 lowers them. |
-| **p-value** | A rough check on whether a result is likely to be real rather than noise. Below 0.05 is the usual bar. |
+| **Confidence interval (CI)** | A range that shows how sure we are about a number. A 95% CI that is narrow means the result is precise. |
+| **Bootstrap** | Re-sampling the people many times to see how much a result would change by chance. Used here to build confidence intervals. |
+| **Ablation** | Removing parts of the model to see which parts actually matter. |
+| **Sensitivity / specificity / precision** | Share of real cases caught / share of healthy people correctly cleared / share of referrals that are real cases. |
+| **Calibration** | Whether a predicted risk of 40% really means about 40% of those people have the condition. |
+| **Odds ratio (OR)** | How much the odds of a condition change when a measurement goes up by one standard deviation (SD). Above 1 raises the odds, below 1 lowers them. |
+| **Kappa / phi** | Measures of how much two yes or no labels agree, beyond chance. |
 
 ---
 
 ## 7. Walkthrough of the notebook
 
-The notebook runs in 14 steps. Each has a short explanation and at least one chart.
+The notebook runs in 14 main steps. Steps marked "b", "c" or "d", and the revised steps, were added to answer the ICOIN reviewers.
 
-**Step 0. Set up the tools.** Loads the libraries and defines a consistent chart style so every figure looks the same.
+**Step 0. Set up the tools.** Loads the libraries, defines a consistent chart style, and defines the helper tools used later (repeated cross-validation, confidence intervals, in-fold VIF).
 
-**Step 1. Load the data.** Finds the Excel file wherever it lives, then reads the real column names from row 2 and the records from row 4 onwards. Result: 163 people, 60 columns.
+**Step 1. Load the data.** Reads the real column names from row 2 and the records from row 4 onwards. Result: 163 people, 60 columns.
 
-**Step 2. First look.** A doughnut chart showing how much of the raw table is actually filled in. Most of it is complete.
+**Step 2. First look.** A doughnut chart showing how much of the raw table is filled in.
 
-**Step 3. Clean the data.** Three small but important fixes:
+**Step 3. Clean the data.** Fixes the fall label (`"NO"` vs `"NO "`), converts age bands to midpoints, and builds the three targets.
 
-- The fall label contains both `"NO"` and `"NO "` with a trailing space. Left alone, that single group would be counted as two. Trimmed and converted to 1 and 0.
-- Age is stored as bands such as `70-74`. The midpoint (72) is used.
-- The three yes or no targets are built from GDS, the fall answer and the Fried score.
-
-**Step 4. Visualise the targets.** How many people have each condition:
+**Step 4. Visualise the targets.**
 
 | Target | People with the condition | Share |
 |---|---|---|
@@ -175,39 +195,33 @@ The notebook runs in 14 steps. Each has a short explanation and at least one cha
 | Falls | 86 of 163 | 53% |
 | Frailty | 49 of 163 | 30% |
 
-Falls is close to an even split. Cognitive decline is the rarest, so its results deserve the most scepticism.
+**Step 5. Who is in the study.** Mostly women, mostly aged 80 and over.
 
-**Step 5. Who is in the study.** Sex, cognitive status and age bands. Mostly women, mostly aged 80 and over. This tells you who the conclusions can reasonably apply to.
+**Step 6. Choose features and remove overlaps.** A correlation heatmap and VIF scores show that speed, stride length, cadence, clearance variability and swing carry overlapping information. Final feature set of six: `age`, `bmi`, `tug`, `step_speed`, `clearance`, `stridetime_std`.
 
-**Step 6. Choose features and remove overlaps.** Ten candidate measurements go in. A correlation heatmap and VIF scores reveal that speed, stride length, cadence, clearance variability and swing all carry roughly the same "how well does this person walk" information. Keeping all of them would produce explanations that contradict each other.
+**Step 6b. Leakage check (new).** The VIF selection is repeated inside every training fold, so test people never influence the choice. Result: AUC 0.746 vs 0.747, difference 0.000. The original feature choice did not inflate the results.
 
-The decision: keep two walking representatives (**step speed** and **foot clearance**), drop the duplicates, and keep the independent measures. Final feature set of six:
+**Step 7. Handle missing values.** Only TUG has gaps, filled with the median inside the modelling pipeline.
 
-`age`, `bmi`, `tug`, `step_speed`, `clearance`, `stridetime_std`
+**Step 8. See the signal with your own eyes.** Box plots of TUG time and walking speed for each group.
 
-After cleaning, every VIF is comfortably under 5 (highest is 2.9 for step speed), which means the redundancy is gone.
+**Step 9. How training and testing work.** 5-fold cross-validation repeated 10 times.
 
-**Step 7. Handle missing values.** Only the TUG column has gaps. They are filled with the median **inside the modelling pipeline**, so the fill value is learned only from training data and never leaks from the test set. This is a small detail that many tutorials get wrong.
+**Step 10. Train and compare.** Logistic regression, random forest and gradient boosting on all three tasks.
 
-**Step 8. See the signal with your own eyes.** Box plots comparing the decline group with the healthy group on TUG time and walking speed. The two groups sit at visibly different heights, so there is a real signal to find before any model is built.
+**Step 10b. Nested cross-validation (new).** Algorithm choice moves inside an inner loop. Result: AUC 0.710, with logistic regression chosen most often.
 
-**Step 9. How training and testing work.** With only 163 people, one train and test split would be unreliable. The notebook uses 5-fold cross-validation repeated 10 times, illustrated with a simple grid diagram.
+**Step 11. Performance, revised.** ROC curves for all 10 repeats, the confusion matrix at a threshold of 0.5 fixed in advance (28 of 43 caught), and the trade-off at other thresholds.
 
-**Step 10. Train and compare.** Three algorithms across three tasks, nine runs in total:
+**Step 11b. Ablation (new).** Is the foot sensor worth it? TUG alone vs sensor alone vs full model.
 
-| Algorithm | In one line |
-|---|---|
-| Logistic Regression | Simple and fully explainable |
-| Random Forest | A voting committee of decision trees |
-| Gradient Boosting | A perfectionist that keeps fixing its own mistakes |
+**Step 11c. Calibration (new).** Brier score, calibration slope and plot.
 
-All three sit inside a pipeline that imputes, then scales, then models. Logistic Regression and Random Forest use balanced class weights so the rarer group is not ignored.
+**Step 11d. Results by GDS stage (new).** Does the model find mild cases, or only more advanced ones?
 
-**Step 11. A closer look at cognitive decline.** The ROC curve and confusion matrix for the winning model. 31 of 43 cases caught, 12 missed.
+**Step 12. What the model learned, revised.** Odds ratios per SD with 95% confidence intervals and a bootstrap check.
 
-**Step 12. What the model learned.** Odds ratios for each of the six features. See the next section.
-
-**Step 13. How the three tasks relate.** Each person gets a risk score for all three tasks, and those scores are compared. This is the most interesting step in the notebook.
+**Step 13. How the three tasks relate, revised.** Compares the model risk scores and the real labels across tasks, and tests whether gait adds information beyond frailty, falls and age.
 
 **Step 14. Findings and limits.**
 
@@ -215,34 +229,34 @@ All three sit inside a pipeline that imputes, then scales, then models. Logistic
 
 ## 8. What the model learned
 
-Odds ratios from the logistic regression on the cognitive decline task, with all features standardised so they can be compared fairly:
+Odds ratios from logistic regression on the cognitive decline task, per one standard deviation (SD) of each measurement, with 95% confidence intervals:
 
-| Feature | Odds ratio | Direction | Statistically reliable (p < 0.05) |
+| Feature | 1 SD equals | Odds ratio (95% CI) | Clear effect? |
 |---|---|---|---|
-| TUG time | 2.34 | Raises the odds | **Yes** |
-| Age | 1.45 | Raises the odds | No |
-| Step speed | 0.88 | Lowers the odds | No |
-| Stride time variability | 0.69 | Lowers the odds | No |
-| Foot clearance | 0.63 | Lowers the odds | No |
-| BMI | 0.52 | Lowers the odds | **Yes** |
+| TUG time | 9.4 seconds | **2.34** (1.31 to 4.18) | **Yes, raises the odds** |
+| BMI | 5.0 kg/m² | **0.52** (0.33 to 0.80) | **Yes, lowers the odds** |
+| Age | 6.4 years | 1.45 (0.92 to 2.28) | No |
+| Step speed | 0.31 | 0.88 (0.41 to 1.86) | No |
+| Stride time variability | 0.06 | 0.69 (0.38 to 1.26) | No |
+| Foot clearance | 0.14 | 0.63 (0.34 to 1.17) | No |
 
-**How to read this.** A slower Timed Up and Go is by far the strongest sign of cognitive decline. Faster walking and higher foot clearance point the other way, which matches the hesitant, shuffling pattern a clinician would recognise. That is reassuring: the model found something medically sensible rather than a statistical fluke.
+**How to read this.** A slower Timed Up and Go is the only clear risk signal. Lower BMI is also linked to higher odds, which may reflect the weight loss that often comes with cognitive decline, but this data cannot show cause. The sensor measures (speed, clearance, variability) show **no clear independent effect** once TUG and BMI are in the model. Their confidence intervals all include 1.
 
-**Two results that need care before anyone quotes them:**
-
-- **Only TUG and BMI clear the p < 0.05 bar.** The other four directions are suggestive, not established. With 163 people and 43 positive cases, that is expected. Please do not report the non-significant odds ratios as findings.
-- **Stride time variability points the "wrong" way.** In the wider literature, more variable stride timing is usually associated with worse cognition, not better. Here it appears to lower the odds. It is not statistically reliable, and it may be an artefact of the small sample or of how it interacts with TUG. It is flagged here rather than quietly smoothed over.
+Bootstrap confidence intervals (1,000 resamples) give the same conclusions.
 
 ---
 
-## 9. The main finding
+## 9. The main findings
 
-All three tasks use the **same six measurements**. So do they just flag the same people?
+**1. TUG carries most of the signal.** TUG time alone reaches AUC 0.729, close to the full model (0.747). The foot sensor adds little on top of it in this cohort. TUG is a compound task (standing up, walking, turning, sitting down), which may make it more mentally demanding than walking alone.
 
-- **Falls and frailty agree almost perfectly** (correlation around 0.9). For practical purposes they are one physical signal wearing two hats.
-- **Cognitive decline agrees only moderately** (around 0.5 to 0.7). Related, but clearly its own thing.
+**2. The signal is strongest for more advanced decline.** The model separates GDS 4 and above well (AUC 0.802) but not mild decline at GDS 3 (AUC 0.619). It is not an early-detection tool.
 
-That gap is the contribution. If cognitive decline were simply frailty in disguise, its risk score would track frailty almost exactly. It does not. **The walk appears to carry brain-specific information beyond plain physical frailty**, which is the core claim of the Psychointelligence framing.
+**3. Falls and frailty are related, but not the same.** The falls and frailty risk scores correlate at 0.93, but the real labels agree only moderately (phi 0.49, kappa 0.44). The high score correlation mostly reflects that both models use the same inputs.
+
+**4. TUG reflects more than frailty.** With frailty, falls and age held fixed, slower TUG is still linked to cognitive decline (adjusted OR 2.22, 95% CI 1.28 to 3.86). Adding TUG, gait and BMI to a frailty + falls + age model raises AUC from 0.654 to 0.738 (gain +0.083, 95% CI −0.005 to +0.172), which is suggestive but not conclusive.
+
+**In one sentence:** a compound mobility test carries a measurable cognitive signal that is not explained by frailty alone, but in this dataset the foot sensor adds little beyond that test.
 
 ---
 
@@ -250,29 +264,37 @@ That gap is the contribution. If cognitive decline were simply frailty in disgui
 
 Please read this section before citing anything above.
 
-- **This is a screening signal, not a diagnosis.** Only a qualified clinician can diagnose dementia. Nothing here should be used to make a clinical decision about a real person.
-- **Small sample.** 163 people, of whom 43 show signs of decline. The findings need replication on a larger and more varied group before they mean much.
-- **Narrow cohort.** Mostly women, mostly aged 80 and over, recruited in one study. The results may not transfer to younger, male or more diverse populations.
-- **Snapshot, not a prediction.** Walking and cognition were measured at the same time. This work cannot yet show that walking predicts *future* decline.
-- **Association, not cause.** A slower TUG is linked to cognitive decline here. That does not mean one causes the other.
-- **The feature selection saw all the data.** Correlation and VIF pruning were done on the full dataset before cross-validation. This is a mild form of optimistic bias, because the test folds influenced which features were kept.
-- **The odds ratio model was fitted on all 163 people**, so those coefficients describe this dataset rather than a held-out sample.
-- **The reported numbers are not nested-CV numbers.** Choosing the best algorithm per task by looking at cross-validation scores will flatter those same scores slightly.
-
-The fix for the last three points is the same, and it is the top item on the roadmap.
+- **This is a research signal, not a diagnosis.** GDS 3 or more is a staging threshold, not a dementia diagnosis. Nothing here should be used to make a clinical decision about a real person.
+- **Not an early-detection tool.** Mild decline (GDS 3) is not reliably detected.
+- **Small sample.** 163 people, of whom 43 show signs of decline.
+- **Narrow cohort.** Mostly women, mostly aged 80 and over, from one study, with no external validation.
+- **Snapshot, not a prediction.** Walking and cognition were measured at the same time, so this cannot show that walking predicts *future* decline.
+- **Risk scores are not probabilities.** Because of class-balanced weighting, predicted risks are too high (mean 0.44 vs a true rate of 0.26). Use them for ranking only.
+- **Confounders were not controlled.** Pain, medication, walking aids and other conditions can all affect gait.
+- **Odds ratio intervals are exploratory.** The odds ratio model was fitted on all 163 people, and its intervals do not account for the feature-selection step.
 
 ---
 
 ## 11. Roadmap
 
-Ranked by how much each would improve the credibility of the results:
+Done in this version:
 
-1. **Nested cross-validation.** Move feature selection and algorithm choice inside the inner loop, so the reported score comes from data the whole procedure has never seen. This is what turns these numbers into publication-grade numbers.
-2. **Confidence intervals on every score.** Report AUC with a bootstrap interval rather than a single mean, so readers can judge how much the difference between algorithms means.
-3. **Threshold tuning for screening.** A screening tool usually wants a high catch rate and tolerates more false alarms. The 0.5 default is not the right operating point. Pick the threshold from a stated clinical preference and report performance there.
-4. **External validation.** Test on a second, independent cohort. This is the single strongest evidence that the signal is real.
-5. **Calibration check.** Verify that a predicted risk of 0.7 really does correspond to about a 70% chance, which matters more than AUC for anything used in practice.
-6. **Add SHAP explanations.** Per-person explanations alongside the population-level odds ratios, so a clinician can see why this individual was flagged.
+- ✅ Leakage check with feature selection inside each fold
+- ✅ Nested cross-validation
+- ✅ Bootstrap confidence intervals on every score
+- ✅ Threshold fixed in advance, with the trade-off at other thresholds shown
+- ✅ Calibration check
+- ✅ Ablation against TUG alone
+- ✅ Adjusted analysis beyond frailty and falls
+
+Still to do:
+
+1. **External validation** on a second, independent cohort.
+2. **Longitudinal testing**: does gait today predict cognitive decline later?
+3. **Recalibration**, so the risk scores can be read as real probabilities.
+4. **Richer protocols**: compare TUG with dual-task walking and free-living sensor data.
+5. **Subgroup checks** by sex, age band and mobility aids.
+6. **More psychointelligence layers**: mood, fear of falling, daily routine and home environment.
 
 ---
 
@@ -298,11 +320,13 @@ The random seed is fixed at 42, so re-running the notebook on the same data repr
 
 ## 13. Citation and credit
 
+**Paper.** C. Iwendi, C. Lemeke, M. Raji, G. O. Oghenekioja, M. D. Edom and S. A. Afolaranmi, "Psychointelligence for Dementia and Falls in Older Adults: Interpretable Cognitive-Decline Screening from Gait Sensor Data," accepted at the *International Conference on Information Networking (ICOIN 2027)*.
+
 **Dataset.** Please cite the original GSTRIDE data descriptor:
 
 > García-de-Villa, S., Jiménez, A. R., del-Ama, A. J., et al. (2023). A database with frailty, functional and inertial gait metrics for the research of fall causes in older adults. *Scientific Data*, 10, 566. https://doi.org/10.1038/s41597-023-02428-0
 
-**This analysis.** Collins Lemeke, Centre of Intelligence of Things (CIoTh), University of Greater Manchester. Part of an ongoing line of work on explainable cognitive-decline screening from gait sensor data.
+**This analysis.** Collins Lemeke, Centre of Intelligence of Things (CIoTh), University of Greater Manchester.
 
 **Contact and links.** GitHub [@CollinsLemeke](https://github.com/CollinsLemeke) · Kaggle [collinslemeke](https://www.kaggle.com/collinslemeke)
 
